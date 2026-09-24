@@ -1,0 +1,8 @@
+fastapi[standard]
+SQLAlchemy
+alembic
+python-dotenv
+psycopg2-binary
+black
+isort
+pytest
