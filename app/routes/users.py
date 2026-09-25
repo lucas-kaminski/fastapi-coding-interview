@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.users import UserCreate, UserRead, UserUpdate
 
@@ -20,9 +21,15 @@ def create(
     payload: UserCreate,
     db: Session = Depends(get_db),
 ) -> UserRead:
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=409, detail="Email already registered")
+
     user = User(
         first_name=payload.first_name,
         last_name=payload.last_name,
+        email=payload.email,
+        hashed_password=hash_password(payload.password),
+        role=payload.role,
     )
 
     db.add(user)
@@ -56,7 +63,17 @@ def update(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    fields = payload.model_dump(exclude_unset=True)
+
+    if "email" in fields:
+        owner = db.query(User).filter(User.email == fields["email"]).first()
+        if owner and owner.id != id:
+            raise HTTPException(status_code=409, detail="Email already registered")
+
+    if "password" in fields:
+        fields["hashed_password"] = hash_password(fields.pop("password"))
+
+    for field, value in fields.items():
         setattr(user, field, value)
 
     db.commit()

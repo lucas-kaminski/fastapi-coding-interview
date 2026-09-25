@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -33,7 +35,13 @@ def client(db):
 @pytest.fixture
 def make_user(db):
     def make(**fields):
-        user = User(**{"first_name": "Lucas", "last_name": "Kaminski", **fields})
+        defaults = {
+            "first_name": "Lucas",
+            "last_name": "Kaminski",
+            "email": f"{uuid4().hex}@example.com",
+            "hashed_password": "hashed",
+        }
+        user = User(**{**defaults, **fields})
         db.add(user)
         db.flush()
         return user
