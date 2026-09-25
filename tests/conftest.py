@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.db import engine, get_db
 from app.main import app
+from app.models.courses import Course
+from app.models.user import User
 
 
 @pytest.fixture
@@ -26,3 +28,25 @@ def client(db):
     yield TestClient(app)
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def make_user(db):
+    def make(**fields):
+        user = User(**{"first_name": "Lucas", "last_name": "Kaminski", **fields})
+        db.add(user)
+        db.flush()
+        return user
+
+    return make
+
+
+@pytest.fixture
+def make_course(db):
+    def make(**fields):
+        course = Course(**{"title": "Math", "description": "Algebra", **fields})
+        db.add(course)
+        db.flush()
+        return course
+
+    return make
