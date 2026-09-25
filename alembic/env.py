@@ -13,6 +13,7 @@ load_dotenv()
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.models.user import User
+from app.models.courses import Course
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
