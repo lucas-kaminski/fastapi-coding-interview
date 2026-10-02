@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import get_current_user, require_admin
 from app.models.courses import Course
+from app.models.user import User
 from app.schemas.courses import CoursesCreate, CoursesRead, CoursesUpdate
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -11,6 +13,7 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 @router.get("/", response_model=list[CoursesRead])
 def get_all(
     db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> list[CoursesRead]:
     return db.query(Course).all()
 
@@ -19,6 +22,7 @@ def get_all(
 def create(
     payload: CoursesCreate,
     db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
 ) -> CoursesRead:
     courses = Course(
         title=payload.title,
@@ -36,6 +40,7 @@ def create(
 def get_by_id(
     id: int,
     db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
 ) -> CoursesRead:
     courses = db.query(Course).get(id)
 
@@ -50,6 +55,7 @@ def update(
     id: int,
     payload: CoursesUpdate,
     db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
 ) -> CoursesRead:
     courses = db.query(Course).get(id)
 
@@ -69,6 +75,7 @@ def update(
 def delete(
     id: int,
     db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
 ) -> dict:
     courses = db.query(Course).get(id)
 

@@ -1,5 +1,7 @@
 def create_course(client, title="Math", description="Algebra and geometry"):
-    response = client.post("/courses", json={"title": title, "description": description})
+    response = client.post(
+        "/courses", json={"title": title, "description": description}
+    )
     assert response.status_code == 200
     assert "id" in response.json()
     return response.json()

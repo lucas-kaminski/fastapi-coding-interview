@@ -5,9 +5,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.db import engine, get_db
+from app.core.security import create_access_token
 from app.main import app
 from app.models.courses import Course
-from app.models.user import User
+from app.models.user import Role, User
 
 
 @pytest.fixture
@@ -24,12 +25,23 @@ def db():
 
 
 @pytest.fixture
-def client(db):
+def client_for(db):
     app.dependency_overrides[get_db] = lambda: db
 
-    yield TestClient(app)
+    def make(user=None):
+        if user is None:
+            return TestClient(app)
+        token = create_access_token(user.id)
+        return TestClient(app, headers={"Authorization": f"Bearer {token}"})
+
+    yield make
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(client_for, make_user):
+    return client_for(make_user(role=Role.ADMIN))
 
 
 @pytest.fixture

@@ -2,8 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import hash_password
-from app.models.user import User
+from app.core.security import (
+    ensure_self_or_admin,
+    get_current_user,
+    hash_password,
+    require_admin,
+)
+from app.errors import PermissionDeniedError
+from app.models.user import Role, User
 from app.schemas.users import UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -12,6 +18,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/", response_model=list[UserRead])
 def get_all(
     db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
 ) -> list[UserRead]:
     return db.query(User).all()
 
@@ -29,7 +36,6 @@ def create(
         last_name=payload.last_name,
         email=payload.email,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
     )
 
     db.add(user)
@@ -43,7 +49,9 @@ def create(
 def get_by_id(
     id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> UserRead:
+    ensure_self_or_admin(current_user, id)
     user = db.query(User).get(id)
 
     if not user:
@@ -57,13 +65,18 @@ def update(
     id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> UserRead:
+    ensure_self_or_admin(current_user, id)
     user = db.query(User).get(id)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     fields = payload.model_dump(exclude_unset=True)
+
+    if "role" in fields and current_user.role != Role.ADMIN:
+        raise PermissionDeniedError("Only an admin can change roles")
 
     if "email" in fields:
         owner = db.query(User).filter(User.email == fields["email"]).first()
@@ -86,7 +99,9 @@ def update(
 def delete(
     id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
+    ensure_self_or_admin(current_user, id)
     user = db.query(User).get(id)
 
     if not user:

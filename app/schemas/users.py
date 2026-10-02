@@ -22,7 +22,6 @@ class UserCreate(BaseModel):
     last_name: str
     email: EmailStr
     password: str = Field(min_length=8)
-    role: Role = Role.USER
 
 
 class UserUpdate(BaseModel):

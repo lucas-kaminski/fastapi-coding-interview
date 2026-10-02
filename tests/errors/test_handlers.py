@@ -1,7 +1,13 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.errors import ConflictError, LimitExceededError, NotFoundError
+from app.errors import (
+    AuthenticationError,
+    ConflictError,
+    LimitExceededError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from app.errors.handlers import register_error_handlers
 
 
@@ -28,3 +34,12 @@ def test_service_errors_become_http_errors():
 
         assert response.status_code == status
         assert response.json() == {"detail": exc.detail}
+
+
+def test_permission_and_authentication_errors():
+    response = make_client(PermissionDeniedError("Admin role required")).get("/boom")
+    assert response.status_code == 403
+
+    response = make_client(AuthenticationError("Invalid token")).get("/boom")
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
