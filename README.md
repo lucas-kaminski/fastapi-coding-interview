@@ -1,8 +1,19 @@
 # FastAPI Coding Exercise
 
-This repository contains a simple FastAPI project designed for technical interviews.
+[![CI](https://github.com/lucas-kaminski/fastapi-coding-interview/actions/workflows/ci.yml/badge.svg)](https://github.com/lucas-kaminski/fastapi-coding-interview/actions/workflows/ci.yml)
 
-The project already includes a **User module** as a reference. You are expected to build additional modules according to the exercise.  
+Technical interview for the Python Platform Engineer position at [BEON.tech](https://beon.tech).
+
+BEON provided a FastAPI project with a users module. The exercise asks for a courses module, enrollments with limits, error handling, and authentication with roles. The [exercise PDF](./content/Python%20FastAPI%20Coding%20Exercise.pdf) describes the full task. The original project lives at [gitlab.com/beontechstudio/python-fastapi-coding-interview](https://gitlab.com/beontechstudio/python-fastapi-coding-interview).
+
+## ✅ Checklist
+
+- [x] Courses module with full CRUD.
+- [x] Enrollments: up to 5 courses per user and up to 20 users per course.
+- [x] Error handling: 401, 403, 404, 409 and 422 with a JSON `detail`.
+- [x] Users with email, password and role.
+- [x] Login with JWT and access by role.
+- [x] Integration tests for the routes and unit tests for the business rules.
 
 ## 🛠️ Requirements
 
@@ -15,8 +26,8 @@ The project already includes a **User module** as a reference. You are expected 
 ### 1. Clone the repository
 
 ```bash
-git clone https://gitlab.com/beontechstudio/python-fastapi-coding-interview.git
-cd python-fastapi-coding-interview
+git clone https://github.com/lucas-kaminski/fastapi-coding-interview.git
+cd fastapi-coding-interview
 ```
 
 ### 2. Create and activate a virtual environment (example with venv)
@@ -41,7 +52,7 @@ Copy .env.example into a new .env file:
 cp .env.example .env
 ```
 
-Edit .env to match your database connection.
+Edit .env to match your database connection. Set `SECRET_KEY` to a random value. The app refuses to start without it.
 
 ### 5. Initialize the database
 
@@ -51,16 +62,24 @@ make migrate
 
 `make migrate` starts PostgreSQL with Docker Compose and runs `alembic upgrade head`.
 
-### 6. Run the application
+### 6. Create the first admin
+
+```bash
+make admin email=admin@example.com password=secret-password
+```
+
+Sign-up through the API always creates the `user` role. Only an admin can promote another user.
+
+### 7. Run the application
 
 ```bash
 make run
 ```
 
-### 7. Run the tests
+### 8. Run the tests
 
 ```bash
-.venv/bin/pytest
+make test
 ```
 
 The tests use the database from `.env`. Each test rolls back its own transaction.
@@ -79,16 +98,25 @@ Open your browser at 👉 http://localhost:8000/docs to see the interactive API 
 
 `app/services/enrollments.py` enforces these rules and raises errors from `app/errors/`. A global handler turns each error into an HTTP response: 404 for a missing resource, 409 for a duplicate, 422 for a full limit.
 
-## 🚧 Not done
+## 🔐 Authentication and authorization
 
-Authentication and authorization are incomplete. The user model has `email`, `password` and `role`, but nothing uses them yet. The missing parts:
+`POST /auth/login` receives `username` (the email) and `password` as a form and returns a JWT. The token expires in one hour. Send it as `Authorization: Bearer <token>`. In `/docs`, the **Authorize** button does the login for you.
 
-- A login endpoint that checks the password and returns a JWT.
-- A dependency that reads the token and loads the current user.
-- A dependency that requires the `admin` role.
-- An access policy: a `user` reads courses and manages only their own enrollments; an `admin` manages everything.
-- A public sign-up endpoint that always creates the `user` role.
-- A script that creates the first admin.
+`app/core/security.py` holds the dependencies. `get_current_user` reads the token and loads the user. `require_admin` blocks any role other than `admin`. `ensure_self_or_admin` blocks access to another user's data.
+
+| Route | `user` | `admin` |
+|---|---|---|
+| `POST /users` (sign-up) | public, always `user` role | same |
+| `GET /users` | 403 | all users |
+| `GET`, `PATCH`, `DELETE /users/{id}` | own account only | any user |
+| Change `role` | 403 | allowed |
+| `GET /courses`, `GET /courses/{id}` | allowed | allowed |
+| `POST`, `PATCH`, `DELETE /courses` | 403 | allowed |
+| `POST /enrollments` | own `user_id` only | any user |
+| `GET /enrollments` | own enrollments only | all, with filters |
+| `GET`, `DELETE /enrollments/{id}` | own enrollments only | any enrollment |
+
+A missing or invalid token returns 401. A token of a deleted user also returns 401.
 
 ## 🔧 Possible improvements
 
@@ -110,8 +138,13 @@ Code structure:
 
 Tests and tooling:
 - Run the tests against a separate test database.
-- Add Ruff, mypy and pip-audit in CI.
+- Replace Black and isort with Ruff, and add mypy and pip-audit to CI.
 - Pin the dependency versions.
+
+Authentication:
+- Add refresh tokens and a logout that revokes them.
+- Rate limit `/auth/login` against brute force.
+- Read the token lifetime from the environment.
 
 Operations:
 - Add a `/health` endpoint.
